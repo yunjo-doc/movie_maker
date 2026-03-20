@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python cli.py plan \"AI시대 자녀교육 - AI가 아이들을 멍청하게 만든다는 착각\")"
+    ]
+  }
+}

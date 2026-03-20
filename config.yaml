@@ -1,0 +1,87 @@
+pipeline:
+  output_dir: "output"
+  log_level: "INFO"
+  max_retries: 3
+
+script:
+  model: "claude-sonnet-4-20250514"
+  chapters: 5
+  chars_per_chapter: 1600         # 5챕터 × 1600자 ≈ 8000자 ≈ 18분
+  target_duration_minutes: 18     # 목표 영상 길이 (분)
+  style: "감정적, 문학적, 스토리텔링"
+
+tts:
+  primary: "elevenlabs"
+  fallback: "edge"
+  edge:
+    voice: "ko-KR-SunHiNeural"
+    rate: "+5%"
+    words_in_cue: 5
+  elevenlabs:
+    voice_id: "OEaq3WGNtNvFJ5co9mJE"  # SangHo (상호) - 남성, 내레이션/스토리
+    model_id: "eleven_multilingual_v2"
+    stability: 0.5
+    similarity_boost: 0.75
+
+images:
+  model: "imagen-4.0-generate-001"
+  batch_delay: 6.0
+  max_retries: 3
+  fallback_to_stock: true
+
+  # 스타일 프리셋 (스토리보드 + 이미지 생성 모두에 적용)
+  # 변경하면 이후 모든 영상의 그림 스타일이 바뀜
+  style_preset: "cinematic_documentary"
+  style_description: "시네마틱 다큐멘터리 스타일, 따뜻한 색감, 드라마틱 조명, 영화적 구도"
+  style_suffix: ", cinematic documentary style, warm color grading, dramatic lighting, shallow depth of field, photorealistic, high detail"
+
+  # 고정 캐릭터 묘사 (선택, 비워두면 사용 안 함)
+  # 인물이 반복 등장하는 채널이면 여기에 외모를 고정
+  character_sheet: ""
+  # 예시: "A young Korean woman, mid-20s, shoulder-length black hair, warm brown eyes, navy blazer, white blouse"
+
+  # 사용 가능한 프리셋 참고:
+  # cinematic_documentary: 시네마틱 다큐, 영화적 조명
+  # digital_illustration: 디지털 일러스트, 따뜻한 색감
+  # anime_ghibli: 지브리풍 애니메이션, 파스텔톤
+  # webtoon: 한국 웹툰 스타일, 깔끔한 선화
+  # watercolor: 수채화 스타일, 부드러운 질감
+  # photorealistic: 사실적 사진, 8K 품질
+
+i2v:
+  model: "kling-v2-6"        # kling-v1-6, kling-v2-6, kling-v3
+  duration: 5                 # 5 또는 10초
+  mode: "std"                 # std (빠름) 또는 pro (고품질)
+  cfg_scale: 0.5              # 프롬프트 충실도 (0~1)
+  i2v_ratio: 0.2              # 전체 씬 중 I2V 비율 (PRD 권장: 20%)
+  poll_interval: 10           # 폴링 간격 (초)
+  timeout: 300                # 생성 타임아웃 (초)
+
+video:
+  resolution: "1920x1080"
+  fps: 30
+  crf: 18
+  crf_intermediate: 12        # 중간 클립용 (재인코딩 품질 보존)
+  min_bitrate: "4M"            # 최소 비트레이트 (유튜브 1080p 권장: 8M)
+  max_bitrate: "12M"           # 최대 비트레이트
+  bufsize: "16M"               # VBV 버퍼 크기
+  preset: "medium"
+  font_name: "Malgun Gothic"
+  font_size: 24
+  subtitle_margin_v: 40
+  transition_duration: 0.5     # 씬 전환 페이드 (초)
+  bgm_dir: "bgm"              # BGM 파일 폴더 (mp3/wav)
+  bgm_volume: 0.08            # BGM 볼륨 (나레이션 대비, 0.05~0.15 권장)
+
+thumbnail:
+  width: 1280
+  height: 720
+  font_path: "C:/Windows/Fonts/malgunbd.ttf"
+  font_size: 64
+
+youtube:
+  category_id: "22"
+  privacy_status: "private"
+  default_language: "ko"
+  # 예약 발행: "18:00" 형식 (다음 해당 시각에 공개), 비워두면 즉시
+  schedule_time: ""
