@@ -4,6 +4,7 @@ import os
 import logging
 import edge_tts
 from pydub import AudioSegment
+from utils.korean_number import convert_numbers_for_tts
 from datetime import timedelta
 import srt as srt_lib
 from utils.srt_converter import save_srt
@@ -21,6 +22,7 @@ class EdgeTTSProvider:
 
     async def generate_single(self, text: str, audio_path: str) -> list:
         """단일 텍스트 → MP3 + srt.Subtitle 리스트 반환"""
+        text = convert_numbers_for_tts(text)
         communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
         subs = []
         idx = 1

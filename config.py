@@ -24,6 +24,10 @@ class Settings:
         return os.getenv("GEMINI_API_KEY", "")
 
     @property
+    def openai_api_key(self) -> str:
+        return os.getenv("OPENAI_API_KEY", "")
+
+    @property
     def elevenlabs_api_key(self) -> str:
         return os.getenv("ELEVENLABS_API_KEY", "")
 

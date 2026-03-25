@@ -5,17 +5,21 @@ pipeline:
 
 script:
   model: "claude-sonnet-4-20250514"
-  chapters: 5
-  chars_per_chapter: 1600         # 5챕터 × 1600자 ≈ 8000자 ≈ 18분
-  target_duration_minutes: 18     # 목표 영상 길이 (분)
-  style: "감정적, 문학적, 스토리텔링"
+  chapters: 6
+  chars_per_chapter: 750          # 6챕터 × 750자 ≈ 4500자 ≈ 10분
+  target_duration_minutes: 10     # 목표 영상 길이 (분)
+  style: "균형 잡힌 분석, 쉬운 설명, 신뢰감 있는 정보 전달"
 
 tts:
-  primary: "elevenlabs"
+  primary: "openai"
   fallback: "edge"
+  openai:
+    model: "tts-1-hd"               # tts-1 (빠름) 또는 tts-1-hd (고품질)
+    voice: "onyx"                    # alloy, echo, fable, onyx, nova, shimmer
+    speed: 1.15                      # 0.25~4.0 (1.1~1.2 권장)
   edge:
-    voice: "ko-KR-SunHiNeural"
-    rate: "+5%"
+    voice: "ko-KR-HyunsuNeural"     # 최신 자연스러운 남성 음성
+    rate: "+15%"
     words_in_cue: 5
   elevenlabs:
     voice_id: "OEaq3WGNtNvFJ5co9mJE"  # SangHo (상호) - 남성, 내레이션/스토리
@@ -31,9 +35,9 @@ images:
 
   # 스타일 프리셋 (스토리보드 + 이미지 생성 모두에 적용)
   # 변경하면 이후 모든 영상의 그림 스타일이 바뀜
-  style_preset: "cinematic_documentary"
-  style_description: "시네마틱 다큐멘터리 스타일, 따뜻한 색감, 드라마틱 조명, 영화적 구도"
-  style_suffix: ", cinematic documentary style, warm color grading, dramatic lighting, shallow depth of field, photorealistic, high detail"
+  style_preset: "minimal_infographic"
+  style_description: "미니멀 인포그래픽 스타일, 흰 배경, 블루/그레이 색상, 데이터 시각화, 플랫 디자인"
+  style_suffix: ", minimalist infographic style, clean white background, modern data visualization, flat design icons, subtle blue and gray color palette, professional chart graphics, clean typography, simple geometric shapes"
 
   # 고정 캐릭터 묘사 (선택, 비워두면 사용 안 함)
   # 인물이 반복 등장하는 채널이면 여기에 외모를 고정
@@ -55,7 +59,7 @@ i2v:
   cfg_scale: 0.5              # 프롬프트 충실도 (0~1)
   i2v_ratio: 0.2              # 전체 씬 중 I2V 비율 (PRD 권장: 20%)
   poll_interval: 10           # 폴링 간격 (초)
-  timeout: 300                # 생성 타임아웃 (초)
+  timeout: 600                # 생성 타임아웃 (초)
 
 video:
   resolution: "1920x1080"
@@ -71,7 +75,7 @@ video:
   subtitle_margin_v: 40
   transition_duration: 0.5     # 씬 전환 페이드 (초)
   bgm_dir: "bgm"              # BGM 파일 폴더 (mp3/wav)
-  bgm_volume: 0.08            # BGM 볼륨 (나레이션 대비, 0.05~0.15 권장)
+  bgm_volume: 0.05            # BGM 볼륨 (나레이션 대비, 0.03~0.10 권장)
 
 thumbnail:
   width: 1280

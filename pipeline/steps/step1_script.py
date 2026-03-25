@@ -130,7 +130,7 @@ JSON 형식: {{"chapter_title": "제목", "script": "대본 텍스트"}}
 - 위치: {i}번째 (총 {num_chapters}개 중)
 
 {'후킹 전략: ' + hook if i == 1 else ''}
-{'마무리: 감동적 결론 + 구독/좋아요 유도 + 다음 영상 예고' if i == num_chapters else ''}
+{'마무리: 감동적 결론 + 구독/좋아요 유도 + 댓글 참여 유도' if i == num_chapters else ''}
 
 작성 규칙:
 - 분량: 약 {chars}자 (엄격히 준수, 초과 금지)

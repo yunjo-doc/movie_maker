@@ -68,34 +68,43 @@ class GenerateStoryboardStep(Step):
     def _mark_i2v_scenes(self, scenes: list, ratio: float) -> list:
         """전체 씬 중 ratio 비율만큼 I2V 대상으로 선정
 
-        시각적 임팩트가 큰 씬(움직임 효과가 있는 씬)을 균등 간격으로 선택.
+        첫 씬은 항상 I2V (후킹용), 나머지는 균등 간격으로 선택.
         """
         total = len(scenes)
         i2v_count = max(1, round(total * ratio))
 
-        # 균등 간격으로 선택 (첫 씬은 제외, 하이라이트 위주)
         if i2v_count >= total:
-            indices = list(range(total))
+            indices = set(range(total))
         else:
-            step = total / i2v_count
-            indices = [int(step * i + step / 2) for i in range(i2v_count)]
-            indices = [idx for idx in indices if idx < total]
+            # 첫 씬은 항상 포함 (후킹)
+            indices = {0}
+            remaining = i2v_count - 1
+            if remaining > 0 and total > 1:
+                step = (total - 1) / remaining
+                for i in range(remaining):
+                    idx = int(1 + step * i + step / 2)
+                    if idx < total:
+                        indices.add(idx)
 
         for i, scene in enumerate(scenes):
             if i in indices:
                 scene["use_i2v"] = True
-                scene["motion_prompt"] = self._derive_motion_prompt(scene)
+                scene["motion_prompt"] = self._derive_motion_prompt(scene, is_first=(i == 0))
             else:
                 scene["use_i2v"] = False
 
-        logger.info(f"I2V 대상: {len(indices)}/{total}개 씬")
+        logger.info(f"I2V 대상: {len(indices)}/{total}개 씬 (첫 씬 포함)")
         return scenes
 
     @staticmethod
-    def _derive_motion_prompt(scene: dict) -> str:
+    def _derive_motion_prompt(scene: dict, is_first: bool = False) -> str:
         """이미지 프롬프트에서 움직임 프롬프트 생성"""
         prompt = scene.get("prompt_en", "")
         effect = scene.get("effect", "zoom_in")
+
+        if is_first:
+            # 첫 씬: 역동적 모션 (후킹용)
+            return f"dynamic camera movement, energetic motion, characters moving actively, lively animation, {prompt[:200]}"
 
         motion_map = {
             "zoom_in": "slow cinematic zoom in, subtle ambient motion",

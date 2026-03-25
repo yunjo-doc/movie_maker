@@ -35,6 +35,8 @@ class FFmpegComposer:
         subtitle_path: str,
         output_path: str,
         bgm_path: str = None,
+        bgm_paths: list = None,
+        chapters: list = None,
     ):
         """4-Phase 영상 합성 파이프라인"""
         safe = SafeWorkDir()
@@ -82,14 +84,20 @@ class FFmpegComposer:
             video_only = f"{work}/video_only.mp4"
             self._concat_clips(clips, video_only)
 
-            # Phase C: BGM 준비
-            resolved_bgm = bgm_path or self._find_bgm()
-            if resolved_bgm:
-                logger.info(f"  Phase C: BGM 믹싱 ({Path(resolved_bgm).name})")
-                safe_bgm = f"{work}/bgm.mp3"
-                shutil.copy2(resolved_bgm, safe_bgm)
+            # Phase C: BGM 준비 (챕터별 또는 단일)
+            safe_bgm = None
+            if bgm_paths and chapters and len(bgm_paths) > 1:
+                logger.info(f"  Phase C: 챕터별 BGM 합성 ({len(bgm_paths)}곡)")
+                total_dur = sum(s["duration"] for s in segments)
+                safe_bgm = self._build_chapter_bgm(
+                    bgm_paths, chapters, segments, total_dur, work
+                )
             else:
-                safe_bgm = None
+                resolved_bgm = bgm_path or self._find_bgm()
+                if resolved_bgm:
+                    logger.info(f"  Phase C: BGM 믹싱 ({Path(resolved_bgm).name})")
+                    safe_bgm = f"{work}/bgm.mp3"
+                    shutil.copy2(resolved_bgm, safe_bgm)
 
             # Phase D: 오디오 + 자막 + BGM 합성
             logger.info("  Phase D: 최종 합성 (오디오 + 자막 + BGM)")
@@ -117,6 +125,56 @@ class FFmpegComposer:
 
         finally:
             safe.cleanup()
+
+    def _build_chapter_bgm(self, bgm_paths: list, chapters: list,
+                           segments: list, total_dur: float, work: str) -> str:
+        """챕터별 BGM을 하나의 연속 트랙으로 합성 (크로스페이드 포함)"""
+        num_chapters = len(chapters)
+        segs_per_ch = len(segments) / num_chapters if num_chapters else len(segments)
+        crossfade = 2.0  # 챕터 전환 크로스페이드 (초)
+
+        # 챕터별 duration 계산
+        ch_durations = []
+        for ch_idx in range(num_chapters):
+            start_seg = int(ch_idx * segs_per_ch)
+            end_seg = int((ch_idx + 1) * segs_per_ch)
+            dur = sum(segments[i]["duration"] for i in range(start_seg, min(end_seg, len(segments))))
+            ch_durations.append(dur)
+
+        # 챕터별 BGM 클립 생성 (trim + fade)
+        ch_bgm_clips = []
+        for i, (bgm_path, dur) in enumerate(zip(bgm_paths, ch_durations)):
+            ch_bgm = f"{work}/ch_bgm_{i:02d}.mp3"
+            fade_out_start = max(0, dur - crossfade)
+            self._run_ffmpeg([
+                "-i", bgm_path,
+                "-t", str(dur),
+                "-af", (
+                    f"afade=t=in:st=0:d={crossfade},"
+                    f"afade=t=out:st={fade_out_start}:d={crossfade}"
+                ),
+                "-ar", "48000", "-ac", "2",
+                ch_bgm
+            ])
+            ch_bgm_clips.append(ch_bgm)
+            logger.info(f"    챕터 {i+1} BGM: {Path(bgm_path).stem} ({dur:.0f}초)")
+
+        # 챕터 BGM들을 concat
+        concat_file = f"{work}/bgm_concat.txt"
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for c in ch_bgm_clips:
+                safe_path = c.replace("\\", "/")
+                f.write(f"file '{safe_path}'\n")
+
+        composite_bgm = f"{work}/bgm.mp3"
+        self._run_ffmpeg([
+            "-f", "concat", "-safe", "0",
+            "-i", concat_file,
+            "-ar", "48000", "-ac", "2",
+            "-c:a", "libmp3lame", "-b:a", "192k",
+            composite_bgm
+        ])
+        return composite_bgm
 
     def _run_ffmpeg(self, args: list, timeout: int = 600):
         """FFmpeg 실행 래퍼"""
@@ -216,6 +274,19 @@ class FFmpegComposer:
                 return str(files[0])
         return None
 
+    def _get_duration(self, input_path: str) -> float:
+        """ffprobe로 영상 길이 조회"""
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", input_path],
+            capture_output=True, text=True, timeout=30,
+            encoding="utf-8", errors="replace",
+        )
+        try:
+            return float(result.stdout.strip())
+        except (ValueError, AttributeError):
+            return 5.0  # 기본값
+
     def _adapt_video_clip(self, input_clip: str, output: str, target_duration: float):
         """I2V 비디오 클립을 target 해상도/duration에 맞춤
 
@@ -224,13 +295,15 @@ class FFmpegComposer:
         """
         w, h, fps = self.width, self.height, self.fps
 
-        # 비디오 클립 duration을 target에 맞추기 위해 setpts + trim 사용
+        clip_dur = self._get_duration(input_clip)
+        speed_factor = clip_dur / target_duration if target_duration > 0 else 1.0
+
         self._run_ffmpeg([
             "-i", input_clip,
             "-vf", (
                 f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
                 f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,"
-                f"setpts=PTS*({target_duration}/DURATION)"
+                f"setpts=PTS/{speed_factor}"
             ),
             "-t", str(target_duration),
             "-an",  # I2V 클립의 오디오 제거 (나레이션 사용)
@@ -269,10 +342,13 @@ class FFmpegComposer:
             bgm_name = Path(bgm).name
             inputs += ["-i", bgm_name]
             # 나레이션 원본 + BGM 볼륨 조절 후 믹스
+            # normalize=0: amix 자동 정규화 비활성 (볼륨 반감 방지)
+            # dynaudnorm: 동적 오디오 정규화 (YouTube 볼륨 수준)
             audio_filter = (
                 f"[1:a]volume=1.0[narr];"
                 f"[2:a]volume={self.bgm_volume},aloop=loop=-1:size=2e+09[bgm];"
-                f"[narr][bgm]amix=inputs=2:duration=shortest[aout]"
+                f"[narr][bgm]amix=inputs=2:duration=shortest:normalize=0,"
+                f"dynaudnorm=p=0.9:s=5[aout]"
             )
             audio_map = ["-filter_complex", audio_filter, "-map", "0:v", "-map", "[aout]"]
         else:
@@ -328,11 +404,14 @@ class FFmpegComposer:
             audio_filter = (
                 f"[1:a]volume=1.0[narr];"
                 f"[2:a]volume={self.bgm_volume},aloop=loop=-1:size=2e+09[bgm];"
-                f"[narr][bgm]amix=inputs=2:duration=shortest[aout]"
+                f"[narr][bgm]amix=inputs=2:duration=shortest:normalize=0,"
+                f"dynaudnorm=p=0.9:s=5[aout]"
             )
             audio_map = ["-filter_complex", audio_filter, "-map", "0:v", "-map", "[aout]"]
         else:
-            audio_map = ["-map", "0:v", "-map", "1:a"]
+            # BGM 없을 때도 동적 정규화 적용
+            audio_filter = "[1:a]dynaudnorm=p=0.9:s=5[aout]"
+            audio_map = ["-filter_complex", audio_filter, "-map", "0:v", "-map", "[aout]"]
 
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",

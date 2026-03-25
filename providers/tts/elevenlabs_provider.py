@@ -7,6 +7,7 @@ import requests
 from pydub import AudioSegment
 from utils.retry import api_retry
 from utils.srt_converter import format_srt_time, save_srt
+from utils.korean_number import convert_numbers_for_tts
 import srt as srt_lib
 from datetime import timedelta
 
@@ -56,6 +57,9 @@ class ElevenLabsProvider:
                 all_audio += AudioSegment.silent(duration=CHAPTER_GAP_MS)
                 cumulative_sec += CHAPTER_GAP_MS / 1000.0
 
+            # 한국어 숫자 전처리 (14,000명 → 1만 4천명)
+            text = convert_numbers_for_tts(text)
+
             # 5000자 제한 분할
             chunks = [text[j:j + 4500] for j in range(0, len(text), 4500)]
 
@@ -100,8 +104,9 @@ class ElevenLabsProvider:
             original_text = "".join(chars)
 
         # 1단계: 원본 텍스트를 문장 단위로 분리
+        # 소수점(숫자.숫자) 뒤에서는 분리하지 않음
         import re
-        sentences = re.split(r'(?<=[.!?。])\s*', original_text)
+        sentences = re.split(r'(?<=[.!?。])(?!\d)\s*', original_text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
         # 2단계: 긴 문장은 어절 단위로 추가 분할

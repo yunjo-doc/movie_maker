@@ -236,6 +236,88 @@ def run(topic, project_id, resume, skip_upload, capcut, brief, schedule):
 
 @cli.command()
 @click.argument("project_id")
+@click.option("--schedule", default=None, help="예약 발행 시각 (예: 18:00, KST 기준)")
+def upload(project_id, schedule):
+    """완성된 영상을 YouTube에 업로드만 실행
+
+    \b
+    예시:
+      python cli.py upload ai_subscription_grade
+      python cli.py upload ai_subscription_grade --schedule 18:00
+    """
+    logger = logging.getLogger(__name__)
+
+    output_dir = str(Path(config["pipeline"]["output_dir"]) / project_id)
+    if not Path(output_dir).exists():
+        click.echo(f"프로젝트 없음: {output_dir}")
+        sys.exit(1)
+
+    video_path = str(Path(output_dir) / "video.mp4")
+    if not Path(video_path).exists():
+        click.echo(f"영상 파일 없음: {video_path}")
+        sys.exit(1)
+
+    # 메타데이터 로드
+    metadata = {}
+    meta_path = Path(output_dir) / "metadata.json"
+    if meta_path.exists():
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+
+    # 썸네일 경로
+    thumbnail_path = ""
+    for ext in ["jpg", "png", "jpeg"]:
+        t = Path(output_dir) / f"thumbnail.{ext}"
+        if t.exists():
+            thumbnail_path = str(t)
+            break
+
+    # brief에서 topic 추출
+    topic = project_id
+    brief_path = Path(output_dir) / "brief.json"
+    if brief_path.exists():
+        brief = json.loads(brief_path.read_text(encoding="utf-8"))
+        topic = brief.get("title", project_id)
+
+    if schedule:
+        config["youtube"]["schedule_time"] = schedule
+
+    ctx = PipelineContext(
+        project_id=project_id,
+        topic=topic,
+        output_dir=output_dir,
+        video_path=video_path,
+        thumbnail_path=thumbnail_path,
+        metadata=metadata,
+    )
+
+    click.echo(f"")
+    click.echo(f"{'='*60}")
+    click.echo(f"  YouTube 업로드")
+    click.echo(f"  프로젝트: {project_id}")
+    click.echo(f"  영상: {video_path}")
+    if thumbnail_path:
+        click.echo(f"  썸네일: {thumbnail_path}")
+    if schedule:
+        click.echo(f"  예약: {schedule} KST")
+    click.echo(f"{'='*60}")
+    click.echo(f"")
+
+    try:
+        step = UploadYouTubeStep()
+        ctx = step.run(ctx)
+        click.echo(f"")
+        click.echo(f"{'='*60}")
+        click.echo(f"  업로드 완료!")
+        click.echo(f"  YouTube: {ctx.video_url}")
+        click.echo(f"{'='*60}")
+    except Exception as e:
+        logger.exception(f"업로드 실패: {e}")
+        click.echo(f"\n업로드 실패: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("project_id")
 def status(project_id):
     """프로젝트 진행 상태 확인"""
     output_dir = str(Path(config["pipeline"]["output_dir"]) / project_id)

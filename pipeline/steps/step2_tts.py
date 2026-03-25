@@ -35,7 +35,18 @@ class GenerateTTSStep(Step):
         return ctx
 
     def _run_tts(self, engine: str, chapters, audio_path, srt_path):
-        if engine == "elevenlabs":
+        if engine == "openai":
+            if not settings.openai_api_key:
+                raise RuntimeError("OpenAI API 키가 없습니다")
+            logger.info("OpenAI TTS로 음성 생성...")
+            from providers.tts.openai_tts_provider import OpenAITTSProvider
+            provider = OpenAITTSProvider(
+                api_key=settings.openai_api_key,
+                cfg=config["tts"]["openai"]
+            )
+            provider.generate_chapters(chapters, audio_path, srt_path)
+            logger.info("OpenAI TTS 성공!")
+        elif engine == "elevenlabs":
             if not settings.elevenlabs_api_key:
                 raise RuntimeError("ElevenLabs API 키가 없습니다")
             logger.info("ElevenLabs TTS로 음성 생성...")

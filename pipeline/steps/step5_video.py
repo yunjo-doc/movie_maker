@@ -1,10 +1,10 @@
-"""Step 5: FFmpeg 영상 합성 + BGM 자동 선택"""
+"""Step 5: FFmpeg 영상 합성 + 챕터별 BGM 자동 선택"""
 
 import logging
 from pipeline.base import Step
 from pipeline.context import PipelineContext
 from providers.video.ffmpeg_composer import FFmpegComposer
-from utils.bgm_selector import select_bgm
+from utils.bgm_selector import select_bgm_per_chapter
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -35,15 +35,20 @@ class ComposeVideoStep(Step):
                 seg["video_clip"] = clip
             segments.append(seg)
 
-        # BGM 자동 선택 (bgm/ 폴더에서 내용에 맞는 곡)
-        bgm_path = None
+        # 챕터별 BGM 선택
+        bgm_paths = []
         bgm_dir = config["video"].get("bgm_dir", "bgm")
-        title = ctx.script.get("title", ctx.topic)
-        summary = ctx.script.get("summary", "")
+        chapters = ctx.script.get("chapters", [])
         try:
-            bgm_path = select_bgm(summary, title, bgm_dir)
-            if bgm_path:
-                logger.info(f"BGM 선택 완료: {bgm_path}")
+            chapter_info = [
+                {"chapter_title": ch.get("chapter_title", ""),
+                 "tone": ctx.brief.get("chapters", [{}])[i].get("tone", "")
+                         if i < len(ctx.brief.get("chapters", [])) else ""}
+                for i, ch in enumerate(chapters)
+            ]
+            bgm_paths = select_bgm_per_chapter(chapter_info, bgm_dir)
+            if bgm_paths:
+                logger.info(f"챕터별 BGM 선택 완료: {len(bgm_paths)}곡")
         except Exception as e:
             logger.warning(f"BGM 선택 실패 (BGM 없이 진행): {e}")
 
@@ -54,7 +59,9 @@ class ComposeVideoStep(Step):
             audio_path=ctx.audio_path,
             subtitle_path=ctx.srt_path,
             output_path=output_path,
-            bgm_path=bgm_path,
+            bgm_path=bgm_paths[0] if bgm_paths else None,
+            bgm_paths=bgm_paths,
+            chapters=chapters,
         )
 
         ctx.video_path = output_path
