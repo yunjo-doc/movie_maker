@@ -4,7 +4,7 @@ pipeline:
   max_retries: 3
 
 script:
-  model: "claude-sonnet-4-20250514"
+  model: "claude-sonnet-5-5"
   chapters: 6
   chars_per_chapter: 750          # 6챕터 × 750자 ≈ 4500자 ≈ 10분
   target_duration_minutes: 10     # 목표 영상 길이 (분)
