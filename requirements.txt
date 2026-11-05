@@ -24,3 +24,7 @@ pydantic-settings>=2.5.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.2
 click>=8.1.0
+
+# 웹 UI
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0

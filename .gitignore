@@ -40,3 +40,8 @@ Thumbs.db
 # Test files
 test_*.png
 test_*.mp3
+
+# Desktop app build output
+MovieMaker.exe
+!desktop/build/
+desktop/build/bin/
